@@ -127,7 +127,7 @@ function App() {
         style={{ zIndex: 10, cursor: 'grab' }}
       >
         <h1 style={styles.neonTitle}>
-          Minha Julia! 💜
+          😛
         </h1>
       </motion.div>
 
