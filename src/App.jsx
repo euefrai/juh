@@ -72,7 +72,7 @@ function App() {
         <div style={styles.neonGlow}></div>
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={styles.card}>
           <Lock size={40} color="#7b1fa2" style={{ marginBottom: 20 }} />
-          <h2 style={{ color: '#4a148c', marginBottom: 20 }}>Portal Secreto</h2>
+          <h2 style={{ color: '#4a148c', marginBottom: 20 }}>P xxx-xxx</h2>
           <form onSubmit={handleLogin} style={styles.form}>
             <input 
               type="text" 
