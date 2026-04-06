@@ -1,30 +1,44 @@
-import React, { useState } from 'react';
-import { motion, useSpring, useMotionValue, AnimatePresence } from 'framer-motion';
-import { Heart, HelpCircle, Lock } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { HelpCircle, Lock, Heart } from 'lucide-react';
 
-// Componente para os elementos flutuantes (Tulipas/Corações ou Interrogações)
-const FloatingElement = ({ emoji, direction = 'up' }) => {
-  const randomX = Math.random() * 100; 
-  const duration = 2 + Math.random() * 3; 
-  const delay = Math.random() * 5;
-  const size = 15 + Math.random() * 35;
+// Elementos flutuantes otimizados para performance
+const FloatingElement = React.memo(({ emoji, isChaos = false }) => {
+  const randomX = useMemo(() => Math.random() * 100, []);
+  const randomYInitial = useMemo(() => Math.random() * 100, []);
+  const duration = useMemo(() => 3 + Math.random() * 4, []);
+  const delay = useMemo(() => Math.random() * 5, []);
+  const size = useMemo(() => 20 + Math.random() * 30, []);
+
+  const targetY = isChaos ? (Math.random() > 0.5 ? -120 : 120) : -120;
 
   return (
     <motion.div
-      initial={{ y: direction === 'up' ? '110vh' : '-10vh', x: `${randomX}vw`, opacity: 0, scale: 0 }}
-      animate={{ 
-        y: direction === 'up' ? '-20vh' : '110vh', 
-        opacity: [0, 1, 1, 0],
-        rotate: [0, 180, 360],
-        scale: [0.5, 1.2, 0.8, 1]
+      initial={{ 
+        y: isChaos ? `${randomYInitial}vh` : '110vh', 
+        x: `${randomX}vw`, 
+        opacity: 0, 
+        scale: 0 
       }}
-      transition={{ duration, repeat: Infinity, delay, ease: "easeInOut" }}
-      style={{ position: 'absolute', fontSize: `${size}px`, pointerEvents: 'none', zIndex: 0 }}
+      animate={{ 
+        y: `${targetY}vh`,
+        opacity: [0, 1, 1, 0],
+        rotate: 360,
+        scale: [0.8, 1.2, 1]
+      }}
+      transition={{ duration, repeat: Infinity, delay, ease: "linear" }}
+      style={{ 
+        position: 'absolute', 
+        fontSize: `${size}px`, 
+        pointerEvents: 'none', 
+        zIndex: 50,
+        filter: 'drop-shadow(0 0 10px rgba(156, 39, 176, 0.5))'
+      }}
     >
       {emoji}
     </motion.div>
   );
-};
+});
 
 function App() {
   const [nome, setNome] = useState('');
@@ -32,16 +46,10 @@ function App() {
   const [isWrongUser, setIsWrongUser] = useState(false);
   const [particles, setParticles] = useState([]);
 
-  const cursorX = useMotionValue(-100);
-  const cursorY = useMotionValue(-100);
-  const springConfig = { damping: 20, stiffness: 200 };
-  const heartX = useSpring(cursorX, springConfig);
-  const heartY = useSpring(cursorY, springConfig);
-
   const handleLogin = (e) => {
     e.preventDefault();
     const nomeLimpo = nome.trim().toLowerCase();
-    const permitidos = ['ju', 'juh', 'julia', 'julinha', 'felix'];
+    const permitidos = ['felix'];
 
     if (permitidos.includes(nomeLimpo)) {
       setIsLogged(true);
@@ -51,147 +59,137 @@ function App() {
     }
   };
 
-  const handlePointerMove = (e) => {
-    cursorX.set(e.clientX - 32);
-    cursorY.set(e.clientY - 32);
-    // Cria rastro denso ao mover
-    if (Math.random() > 0.7) {
-      createParticle(e.clientX, e.clientY);
-    }
+  const createParticle = (e) => {
+    const id = Date.now();
+    const newParticle = { id, x: e.clientX, y: e.clientY };
+    setParticles((prev) => [...prev.slice(-15), newParticle]); // Limita a 15 partículas para não travar
+    setTimeout(() => setParticles((prev) => prev.filter((p) => p.id !== id)), 1000);
   };
 
-  const createParticle = (x, y) => {
-    const id = Date.now() + Math.random();
-    setParticles((prev) => [...prev, { id, x, y }]);
-    setTimeout(() => setParticles((prev) => prev.filter((p) => p.id !== id)), 1200);
-  };
-
-  // 1. TELA DE LOGIN (Portal)
   if (!isLogged && !isWrongUser) {
     return (
       <div style={styles.container}>
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} style={styles.card}>
+        <div style={styles.neonGlow}></div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={styles.card}>
           <Lock size={40} color="#7b1fa2" style={{ marginBottom: 20 }} />
-          <h2 style={{ color: '#4a148c', marginBottom: 20 }}>login ?</h2>
+          <h2 style={{ color: '#4a148c', marginBottom: 20 }}>Portal Secreto</h2>
           <form onSubmit={handleLogin} style={styles.form}>
             <input 
               type="text" 
-              placeholder="name..." 
+              placeholder="Seu nome..." 
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               style={styles.input}
             />
-            <button type="submit" style={styles.button}>-</button>
+            <button type="submit" style={styles.button}>Entrar</button>
           </form>
         </motion.div>
       </div>
     );
   }
 
-  // 2. TELA DE ERRO (Caos de Dúvida)
   if (isWrongUser) {
-    const emojisDuvida = ['❓', '🤔', '🤨', '🚫', '🧐', '💭', '❌', '🤷‍♂️', '❗', '😶'];
+    const emojisDuvida = ['❓', '🤔', '🤨', '🚫'];
     return (
-      <div style={{ ...styles.container, backgroundColor: '#1a1a1a' }}>
-        {Array.from({ length: 60 }).map((_, i) => (
-          <FloatingElement key={i} emoji={emojisDuvida[i % emojisDuvida.length]} direction="down" />
+      <div style={{ ...styles.container, backgroundColor: '#111' }}>
+        {Array.from({ length: 30 }).map((_, i) => (
+          <FloatingElement key={i} emoji={emojisDuvida[i % emojisDuvida.length]} isChaos={true} />
         ))}
-        <motion.div 
-          style={{ ...styles.card, backgroundColor: '#333', border: '2px solid #ff4444' }}
-          animate={{ x: [-10, 10, -10, 10, 0] }} 
-          transition={{ repeat: Infinity, duration: 0.5 }}
-        >
+        <motion.div style={styles.cardError} animate={{ x: [-5, 5, -5] }} transition={{ repeat: Infinity, duration: 0.2 }}>
           <HelpCircle size={60} color="#ff4444" />
-          <h1 style={{ color: '#ff4444', marginTop: 10 }}>QUEM É VOCÊ?</h1>
-          <p style={{ color: '#fff' }}>Acesso negado para estranhos. 🤨</p>
-          <button onClick={() => setIsWrongUser(false)} style={{ ...styles.button, backgroundColor: '#ff4444', marginTop: 20 }}>
-            Tentar Novamente
-          </button>
+          <h1 style={{ color: '#ff4444' }}>Acesso Negado</h1>
+          <button onClick={() => setIsWrongUser(false)} style={styles.buttonError}>Voltar</button>
         </motion.div>
       </div>
     );
   }
 
-  // 3. TELA DA JULIA (Explosão Roxa Profunda)
-  const itensJulia = ['🌷', '🌹', '💜', '🍇', '🔮', '✨', '🥀', '💐', '💟', '❣️', '🌌', '🎆', '🌸'];
+  const itensJulia = ['🌷', '💜', '✨', '🌸', '💟', '❣️'];
   
   return (
     <div 
-      onPointerMove={handlePointerMove}
-      onPointerDown={(e) => { createParticle(e.clientX, e.clientY); createParticle(e.clientX + 10, e.clientY + 10); }}
-      style={{ ...styles.container, backgroundColor: '#2e003e', cursor: 'none', touchAction: 'none' }}
+      onPointerDown={createParticle}
+      style={styles.containerMain}
     >
-      {/* Poluição Visual: 80 itens subindo */}
-      {Array.from({ length: 80 }).map((_, i) => (
-        <FloatingElement key={i} emoji={itensJulia[i % itensJulia.length]} direction="up" />
+      {/* Luzes Neon de Fundo */}
+      <div style={styles.neonGlow}></div>
+      <div style={{ ...styles.neonGlow, animationDelay: '2s', left: '60%', top: '20%' }}></div>
+
+      {/* Itens Flutuantes por cima de tudo */}
+      {Array.from({ length: 40 }).map((_, i) => (
+        <FloatingElement key={i} emoji={itensJulia[i % itensJulia.length]} isChaos={true} />
       ))}
 
-      <motion.h1 
-        initial={{ opacity: 0, y: -50 }}
-        animate={{ opacity: 1, y: 0, scale: [1, 1.05, 1] }}
-        transition={{ scale: { repeat: Infinity, duration: 2 } }}
-        style={{ ...styles.title, color: '#e1bee7', fontSize: '2.5rem' }}
+      {/* Nome da Julia com efeito Neon */}
+      <motion.div
+        drag
+        dragConstraints={{ left: -50, right: 50, top: -50, bottom: 50 }}
+        style={{ zIndex: 10, cursor: 'grab' }}
       >
-        Minha Julia! 💜
-      </motion.h1>
+        <h1 style={styles.neonTitle}>
+          Minha Julia! 💜
+        </h1>
+      </motion.div>
 
       <AnimatePresence>
         {particles.map((p) => (
           <motion.div
             key={p.id}
-            initial={{ opacity: 1, scale: 0.5, x: p.x - 10, y: p.y - 10 }}
-            animate={{ opacity: 0, scale: 2.5, y: p.y - 150, rotate: 180 }}
+            initial={{ opacity: 1, scale: 0.5, x: p.x - 15, y: p.y - 15 }}
+            animate={{ opacity: 0, scale: 2, y: p.y - 100 }}
             exit={{ opacity: 0 }}
-            style={{ position: 'absolute', pointerEvents: 'none', zIndex: 5 }}
+            style={{ position: 'absolute', pointerEvents: 'none', zIndex: 60 }}
           >
-            <Heart fill="#9c27b0" color="#f3e5f5" size={25} />
+            <Heart fill="#e1bee7" color="#7b1fa2" size={30} />
           </motion.div>
         ))}
       </AnimatePresence>
-
-      {/* Coração Principal Neon */}
-      <motion.div
-        style={{ position: 'fixed', left: 0, top: 0, x: heartX, y: heartY, pointerEvents: 'none', zIndex: 10 }}
-        animate={{ 
-            scale: [1, 1.3, 1.1, 1.4, 1],
-            rotate: [0, 5, -5, 0]
-        }}
-        transition={{ duration: 1.2, repeat: Infinity }}
-      >
-        <Heart 
-          size={80} 
-          fill="#f3e5f5" 
-          color="#7b1fa2" 
-          style={{ filter: 'drop-shadow(0 0 25px #9c27b0)' }} 
-        />
-      </motion.div>
     </div>
   );
 }
 
 const styles = {
   container: {
-    width: '100vw', height: '100vh',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden', position: 'relative', fontFamily: 'sans-serif', transition: 'background-color 0.5s'
+    width: '100vw', height: '100vh', backgroundColor: '#0f001a',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', position: 'relative', fontFamily: 'sans-serif'
+  },
+  containerMain: {
+    width: '100vw', height: '100vh', backgroundColor: '#0f001a',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', position: 'relative', touchAction: 'none'
+  },
+  neonGlow: {
+    position: 'absolute', width: '400px', height: '400px',
+    background: 'radial-gradient(circle, rgba(123, 31, 162, 0.3) 0%, rgba(15, 0, 26, 0) 70%)',
+    borderRadius: '50%', top: '30%', left: '20%', filter: 'blur(50px)',
+    animation: 'pulse 6s infinite alternate'
+  },
+  neonTitle: {
+    fontSize: '4rem', color: '#fff', textAlign: 'center',
+    textShadow: '0 0 10px #e1bee7, 0 0 20px #e1bee7, 0 0 40px #7b1fa2, 0 0 80px #7b1fa2',
+    userSelect: 'none'
   },
   card: {
-    padding: '40px', backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '30px',
-    boxShadow: '0 20px 50px rgba(0,0,0,0.2)', textAlign: 'center', zIndex: 20, maxWidth: '85%'
+    padding: '40px', backgroundColor: 'rgba(255, 255, 255, 0.1)', borderRadius: '30px',
+    backdropFilter: 'blur(10px)', border: '1px solid rgba(255, 255, 255, 0.2)',
+    textAlign: 'center', zIndex: 20, color: '#fff'
   },
-  form: { display: 'flex', flexDirection: 'column', gap: '15px' },
   input: {
-    padding: '15px', borderRadius: '15px', border: '3px solid #e1bee7',
+    padding: '15px', borderRadius: '15px', border: 'none', backgroundColor: 'rgba(255,255,255,0.9)',
     outline: 'none', fontSize: '18px', textAlign: 'center', color: '#4a148c'
   },
   button: {
     padding: '12px 25px', backgroundColor: '#7b1fa2', color: 'white',
-    border: 'none', borderRadius: '15px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem'
+    border: 'none', borderRadius: '15px', cursor: 'pointer', fontWeight: 'bold',
+    boxShadow: '0 0 15px rgba(123, 31, 162, 0.5)'
   },
-  title: { 
-    pointerEvents: 'none', zIndex: 10, textAlign: 'center', 
-    textShadow: '0 0 15px rgba(156, 39, 176, 0.6)', padding: '20px' 
-  }
+  form: { display: 'flex', flexDirection: 'column', gap: '15px' },
+  cardError: { padding: '40px', backgroundColor: '#222', borderRadius: '30px', textAlign: 'center', zIndex: 100 },
+  buttonError: { padding: '10px 20px', backgroundColor: '#ff4444', color: '#fff', border: 'none', borderRadius: '10px', marginTop: '20px' }
 };
+
+// Adicione isso ao seu arquivo CSS global ou em uma tag <style> no index.html
+// @keyframes pulse { from { transform: scale(1); opacity: 0.5; } to { transform: scale(1.2); opacity: 0.8; } }
 
 export default App;
